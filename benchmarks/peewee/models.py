@@ -1,5 +1,6 @@
 import json
 import os
+import pymysql
 from datetime import datetime
 from decimal import Decimal
 
@@ -14,7 +15,7 @@ from peewee import (
     Model,
     MySQLDatabase,
     SmallIntegerField,
-    TextField,
+    TextField, TimestampField, AutoField, SqliteDatabase,
 )
 from playhouse.postgres_ext import PostgresqlExtDatabase
 from playhouse.sqlite_ext import SqliteExtDatabase
@@ -23,12 +24,9 @@ dbtype = os.environ.get("DBTYPE", "")
 if dbtype == "postgres":
     db = PostgresqlExtDatabase("tbench", user="postgres", password=os.environ.get("PASSWORD"))
 elif dbtype == "mysql":
-    db = MySQLDatabase("tbench", user="root", password=os.environ.get("PASSWORD"))
+    db = MySQLDatabase()
 else:
-    db = SqliteExtDatabase(
-        "/tmp/db.sqlite3",
-        pragmas=(("journal_mode", "wal"),),  # Use WAL-mode (you should always use this!).
-    )
+    db = SqliteDatabase(":memory:")
 
 
 class JSONField(TextField):
@@ -40,7 +38,7 @@ class JSONField(TextField):
             return json.loads(value)
 
 
-test = int(os.environ.get("TEST", "1"))
+test = int(os.environ.get("TEST", "3"))
 if test == 1:
 
     class Journal(Model):
@@ -117,4 +115,12 @@ if test == 3:
 
 def create_tables():
     with db:
+        try:
+            db.drop_tables([Journal])
+        except Exception as e:
+            print(f"Error dropping tables: {e}")
         db.create_tables([Journal])
+        if os.getenv("DBTYPE") == "mysql":
+            print("Database in use: MariaDB")
+        else:
+            print("Database in use: in memory")
